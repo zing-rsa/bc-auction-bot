@@ -1,6 +1,8 @@
 # bot.py
 import os
 import time
+import json
+import copy
 import discord
 import asyncio
 from datetime import datetime
@@ -11,12 +13,46 @@ GUILD = os.getenv('GUILD')
 COMMAND_CHANNEL = os.getenv('COMMAND_CHANNEL')
 TX_CHANNEL = os.getenv('TX_CHANNEL')
 
-
 auctions = {}
-
 auctions_list = []
+ready = False
+looping = True
 
 bot = commands.Bot(command_prefix='!')
+
+def write_history():
+    with open('history.json', 'w+') as f:
+        data = {
+            'auctions': copy.deepcopy(auctions),
+            'auctions_list': list(auctions.keys())
+        }
+
+        for a in data['auctions_list']:
+            data['auctions'][a]['start'] = str(data['auctions'][a]['start'])
+            data['auctions'][a]['end'] = str(data['auctions'][a]['end'])
+
+        json.dump(data, f)
+
+
+def read_history():
+
+    global auctions
+    global auctions_list
+
+    try:
+        with open('history.json', 'r') as j:
+            data = json.load(j)
+
+            for a in data['auctions_list']:
+                data['auctions'][str(a)]['start'] = datetime.strptime(data['auctions'][str(a)]['start'], "%Y-%m-%d %H:%M:%S")
+                data['auctions'][str(a)]['end'] = datetime.strptime(data['auctions'][str(a)]['end'], "%Y-%m-%d %H:%M:%S")
+
+            auctions = data['auctions']
+            auctions_list = data['auctions_list']
+
+    except FileNotFoundError: 
+        print("Couldn't find history file, defaulting")
+
 
 async def update_tx(a_id):
     c = bot.get_channel(int(TX_CHANNEL))
@@ -43,9 +79,10 @@ async def reply_error(ctx, e):
 
 async def handle_start(a_id):
     print('auction-' + auctions[a_id]['name'] + ' started!')
-    channel = bot.get_channel(a_id)
+    channel = bot.get_channel(int(a_id))
     auctions[a_id]['active'] = True
-    await channel.send("This auction has started! Goodluck!")
+    write_history()
+    await channel.send("This auction has started. Goodluck!")
 
 
 async def handle_end(a_id):
@@ -56,33 +93,51 @@ async def handle_end(a_id):
     auctions_list.remove(a_id)
     del auctions[a_id]
 
-    channel = bot.get_channel(a_id)
-    await channel.send("This auction has ended! Thank you!")
+    write_history()
+
+    channel = bot.get_channel(int(a_id))
+    await channel.send("This auction has ended. Thank you!")
 
 
 async def run_checks():
-    while True:
-        now = datetime.now()
 
-        for a_id in auctions_list[:]:
-            if bot.get_channel(a_id) == None:
-                print('Detected removed channel, deleting auction')
-                auctions_list.remove(a_id)
-                del auctions[a_id]
-            else:
-                if now > auctions[a_id]['start'] and now < auctions[a_id]['end'] and auctions[a_id]['active'] == False:
-                    await handle_start(a_id)
-                elif now > auctions[a_id]['end']:
-                    await handle_end(a_id)
+    global bot
+    global looping
+    
+    while looping:
 
+        if ready:
+            print("looping")
+            now = datetime.now()
+
+            for a_id in auctions_list[:]:
+
+                if bot.get_channel(int(a_id)) == None:
+                    print('Detected removed channel, deleting auction')
+                    auctions_list.remove(a_id)
+                    del auctions[a_id]
+                    write_history()
+                    
+                else:
+                    if now > auctions[a_id]['start'] and now < auctions[a_id]['end'] and auctions[a_id]['active'] == False:
+                        await handle_start(a_id)
+                    elif now > auctions[a_id]['end']:
+                        await handle_end(a_id)
+            
+            if len(auctions_list) == 0:
+                looping = False
+        
         await asyncio.sleep(5)
 
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
+    global ready
+    ready = True
 
-@bot.command(name='create', help='Creates a new auction', usage='<name> <price> <start(yyyy-MM-ddTHH:mm:ss)> <end(yyyy-MM-ddTHH:mm:ss)> <image-url>')
-async def create(ctx, name, price: int, start, end, url):
+@bot.command(name='create', help='Creates a new auction', usage='<name> <price> <increment> <start(yyyy-MM-ddTHH:mm:ss)> <end(yyyy-MM-ddTHH:mm:ss)> <image-url> \n -- Note all times are in UTC --')
+async def create(ctx, name, price: int, increment: int, start, end, url):
+    global looping 
 
     if (str(ctx.channel.id) == COMMAND_CHANNEL):
 
@@ -95,10 +150,10 @@ async def create(ctx, name, price: int, start, end, url):
 
             c = await guild.create_text_channel(auctionName, category=discord.utils.get(guild.categories, name='Auctions'))
 
-            auctions[c.id] = {
-                'id': c.id,
+            auctions[str(c.id)] = {
                 'name': name,
                 'price': price,
+                'increment': increment,
                 'highBid': price,
                 'highBidId': None,
                 'highBidName': None,
@@ -108,20 +163,22 @@ async def create(ctx, name, price: int, start, end, url):
                 'bids': 0
             }
 
-            auctions_list.append(c.id)
+            auctions_list.append(str(c.id))
 
             await ctx.send("Auction Created!")
 
             e = discord.Embed(
                 title="Auction: " + name,
-                description="A new auction has started for " + name + "!",
+                description="A new auction has been created for " + name,
                 color=0xFF5733
             )
 
             e.set_thumbnail(url=url)
-            e.add_field(name="Reserve Price:", value=str(price)+"ADA", inline=False)
-            e.add_field(name="Start time", value=datetime.strptime(start, "%Y-%m-%dT%H:%M:%S"), inline=True)
-            e.add_field(name="End Time", value=datetime.strptime(end, "%Y-%m-%dT%H:%M:%S"), inline=True)
+            e.add_field(name="Reserve Price:", value=str(price)+"ADA", inline=True)
+            e.add_field(name="Increment:", value=str(increment)+"ADA", inline=True)
+            e.add_field(name = chr(173), value = chr(173), inline=False)
+            e.add_field(name="Start time", value=str(datetime.strptime(start, "%Y-%m-%dT%H:%M:%S")) + "(UTC)", inline=True)
+            e.add_field(name="End Time", value=str(datetime.strptime(end, "%Y-%m-%dT%H:%M:%S")) + "(UTC)", inline=True)
             e.add_field(name = chr(173), value = chr(173), inline=False)
             e.add_field(name="Highest Bidder:", value="---", inline=True)
             e.add_field(name="Price:", value="---", inline=True)
@@ -131,15 +188,18 @@ async def create(ctx, name, price: int, start, end, url):
 
             msg = await c.send(embed=e)
 
-            auctions[c.id]['embed'] = e.to_dict()
-            auctions[c.id]['msg'] = msg
+            auctions[str(c.id)]['embed'] = e.to_dict()
+            auctions[str(c.id)]['msg_id'] = msg.id
+
+            write_history()
+            looping = True
+            bot.loop.create_task(run_checks())
 
         else:
-            print("channel already exists")
-            ctx.send("Auction channel already exists")
+            await reply_error(ctx, "Auction channel already exists")
             
     else: 
-        print("Use correct channel")
+        await reply_error(ctx, "Creating auctions is not permitted from this channel")
 
 
 @bot.command(name='bid', help='Creates a bid', usage='!bid <price>')
@@ -148,12 +208,12 @@ async def bid(ctx, price: int):
     now = datetime.now()
     a_id = ctx.channel.id
 
-    if a_id in auctions_list:
+    if str(a_id) in auctions_list:
 
-        a = auctions[a_id]
+        a = auctions[str(a_id)]
 
         if a['start'] < now and a['end'] > now:
-            if price > a['highBid']:
+            if price >= (a['highBid'] + a['increment']):
 
                 a['highBid'] = price
                 a['highBidId'] = ctx.message.author.id
@@ -166,16 +226,20 @@ async def bid(ctx, price: int):
                     if field['name'] == 'Highest Bidder:':
                          field['value'] = ctx.message.author.name
                 
-                update_embed=discord.Embed(title="Bid Accepted!", description=ctx.message.author.name + " placed a bid", color=0x00a113)
-                update_embed.add_field(name="Price:", value=str(price)+"ADA")
-                update_embed.set_footer(text=str(now))
+                write_history()
+                
+                bid_embed=discord.Embed(title="Bid Accepted!", description=ctx.message.author.name + " placed a bid", color=0x00a113)
+                bid_embed.add_field(name="Price:", value=str(price)+"ADA")
+                bid_embed.set_footer(text=str(now))
 
-                await ctx.send(embed=update_embed)
+                await ctx.send(embed=bid_embed)
 
-                await a['msg'].edit(embed=discord.Embed.from_dict(a['embed']))
+                org_embed_msg = await ctx.fetch_message(a['msg_id'])
+
+                await org_embed_msg.edit(embed=discord.Embed.from_dict(a['embed']))
                 
             else:
-                await reply_error(ctx, "Min bid is: " + str(a['highBid'] + 1) + "ADA")
+                await reply_error(ctx, "Min bid is: " + str(a['highBid'] + a['increment']) + "ADA")
 
         elif a['start'] > now:
            await reply_error(ctx, "This auction has not started yet")
@@ -184,10 +248,13 @@ async def bid(ctx, price: int):
             await reply_error(ctx, "This auction has ended")
         
     else:
-        await reply_error(ctx, "This auction has ended")
+        await reply_error(ctx, "This auction is no longer valid")
 
-bot.loop.create_task(run_checks())
-bot.run(TOKEN)
+
+if __name__ == "__main__":
+    read_history()
+    bot.loop.create_task(run_checks())
+    bot.run(TOKEN)
 
 
 
