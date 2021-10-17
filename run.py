@@ -107,7 +107,6 @@ async def run_checks():
     while looping:
 
         if ready:
-            print("looping")
             now = datetime.now()
 
             for a_id in auctions_list[:]:
@@ -177,8 +176,8 @@ async def create(ctx, name, price: int, increment: int, start, end, url):
             e.add_field(name="Reserve Price:", value=str(price)+"ADA", inline=True)
             e.add_field(name="Increment:", value=str(increment)+"ADA", inline=True)
             e.add_field(name = chr(173), value = chr(173), inline=False)
-            e.add_field(name="Start time", value=str(datetime.strptime(start, "%Y-%m-%dT%H:%M:%S")) + "(UTC)", inline=True)
-            e.add_field(name="End Time", value=str(datetime.strptime(end, "%Y-%m-%dT%H:%M:%S")) + "(UTC)", inline=True)
+            e.add_field(name="Start time (UTC)", value=datetime.strptime(start, "%Y-%m-%dT%H:%M:%S"), inline=True)
+            e.add_field(name="End Time (UTC)", value=datetime.strptime(end, "%Y-%m-%dT%H:%M:%S"), inline=True)
             e.add_field(name = chr(173), value = chr(173), inline=False)
             e.add_field(name="Highest Bidder:", value="---", inline=True)
             e.add_field(name="Price:", value="---", inline=True)
