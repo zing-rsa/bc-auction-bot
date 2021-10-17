@@ -6,12 +6,14 @@ import copy
 import discord
 import asyncio
 from datetime import datetime
+from pymongo import MongoClient
 from discord.ext import commands, tasks
 
 TOKEN = os.getenv('TOKEN')
 GUILD = os.getenv('GUILD')
 COMMAND_CHANNEL = os.getenv('COMMAND_CHANNEL')
 TX_CHANNEL = os.getenv('TX_CHANNEL')
+MONGO_URL = os.getenv('MONGO_URL')
 
 auctions = {}
 auctions_list = []
@@ -20,39 +22,29 @@ looping = True
 
 bot = commands.Bot(command_prefix='!')
 
-def write_history():
-    with open('history.json', 'w+') as f:
-        data = {
-            'auctions': copy.deepcopy(auctions),
-            'auctions_list': list(auctions.keys())
-        }
+client = MongoClient(MONGO_URL)
+db = client.bensdb
+mongo_auctions = db.auctions
 
-        for a in data['auctions_list']:
-            data['auctions'][a]['start'] = str(data['auctions'][a]['start'])
-            data['auctions'][a]['end'] = str(data['auctions'][a]['end'])
+def save_auc_history():
+    mongo_auctions.replace_one({}, auctions, upsert=True)
 
-        json.dump(data, f)
-
-
-def read_history():
-
+def get_auc_history():
+    print("Fetching auctions")
     global auctions
     global auctions_list
 
-    try:
-        with open('history.json', 'r') as j:
-            data = json.load(j)
+    db_results = mongo_auctions.find_one({})
 
-            for a in data['auctions_list']:
-                data['auctions'][str(a)]['start'] = datetime.strptime(data['auctions'][str(a)]['start'], "%Y-%m-%d %H:%M:%S")
-                data['auctions'][str(a)]['end'] = datetime.strptime(data['auctions'][str(a)]['end'], "%Y-%m-%d %H:%M:%S")
+    print("Got auctions, db results: " + str(db_results))
 
-            auctions = data['auctions']
-            auctions_list = data['auctions_list']
+    auctions = db_results if db_results is not None and len(db_results.keys()) > 1 else {}
 
-    except FileNotFoundError: 
-        print("Couldn't find history file, defaulting")
+    for key in list(auctions.keys()):
+        if key != '_id':
+            auctions_list.append(key)
 
+    print("Done fetching")
 
 async def update_tx(a_id):
     c = bot.get_channel(int(TX_CHANNEL))
@@ -69,21 +61,18 @@ async def update_tx(a_id):
     
     await c.send(embed=e)
 
-
 async def reply_error(ctx, e):
     reply = await ctx.message.reply(e)
     time.sleep(2)
     await ctx.message.delete()
     await reply.delete()
 
-
 async def handle_start(a_id):
     print('auction-' + auctions[a_id]['name'] + ' started!')
     channel = bot.get_channel(int(a_id))
     auctions[a_id]['active'] = True
-    write_history()
+    save_auc_history()
     await channel.send("This auction has started. Goodluck!")
-
 
 async def handle_end(a_id):
     print('auction-' + auctions[a_id]['name'] + ' ended!')
@@ -93,11 +82,10 @@ async def handle_end(a_id):
     auctions_list.remove(a_id)
     del auctions[a_id]
 
-    write_history()
+    save_auc_history()
 
     channel = bot.get_channel(int(a_id))
     await channel.send("This auction has ended. Thank you!")
-
 
 async def run_checks():
 
@@ -115,7 +103,7 @@ async def run_checks():
                     print('Detected removed channel, deleting auction')
                     auctions_list.remove(a_id)
                     del auctions[a_id]
-                    write_history()
+                    save_auc_history()
                     
                 else:
                     if now > auctions[a_id]['start'] and now < auctions[a_id]['end'] and auctions[a_id]['active'] == False:
@@ -134,7 +122,7 @@ async def on_ready():
     global ready
     ready = True
 
-@bot.command(name='create', help='Creates a new auction', usage='<name> <price> <increment> <start(yyyy-MM-ddTHH:mm:ss)> <end(yyyy-MM-ddTHH:mm:ss)> <image-url> \n -- Note all times are in UTC --')
+@bot.command(name='create', help='Creates a new auction', usage='<name> <price> <increment> <start(yyyy-MM-ddTHH:mm:ss)> <end(yyyy-MM-ddTHH:mm:ss)> <image-url> \n\n -- Note all times are in UTC --')
 async def create(ctx, name, price: int, increment: int, start, end, url):
     global looping 
 
@@ -190,16 +178,17 @@ async def create(ctx, name, price: int, increment: int, start, end, url):
             auctions[str(c.id)]['embed'] = e.to_dict()
             auctions[str(c.id)]['msg_id'] = msg.id
 
-            write_history()
-            looping = True
-            bot.loop.create_task(run_checks())
+            save_auc_history()
+
+            if looping == False:
+                looping = True
+                bot.loop.create_task(run_checks())
 
         else:
             await reply_error(ctx, "Auction channel already exists")
             
     else: 
         await reply_error(ctx, "Creating auctions is not permitted from this channel")
-
 
 @bot.command(name='bid', help='Creates a bid', usage='!bid <price>')
 async def bid(ctx, price: int):
@@ -225,7 +214,7 @@ async def bid(ctx, price: int):
                     if field['name'] == 'Highest Bidder:':
                          field['value'] = ctx.message.author.name
                 
-                write_history()
+                save_auc_history()
                 
                 bid_embed=discord.Embed(title="Bid Accepted!", description=ctx.message.author.name + " placed a bid", color=0x00a113)
                 bid_embed.add_field(name="Price:", value=str(price)+"ADA")
@@ -249,13 +238,8 @@ async def bid(ctx, price: int):
     else:
         await reply_error(ctx, "This auction is no longer valid")
 
-
 if __name__ == "__main__":
-    read_history()
+    get_auc_history()
     bot.loop.create_task(run_checks())
     bot.run(TOKEN)
-
-
-
-
 
