@@ -120,7 +120,6 @@ async def run_checks():
         
         await asyncio.sleep(2)
 
-
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} has connected to Discord!')
@@ -176,7 +175,7 @@ async def create(ctx, name, price: int, increment: int, start, end, url='none'):
                 e.add_field(name="Highest Bidder:", value="---", inline=True)
                 e.add_field(name="Price:", value="---", inline=True)
                 e.add_field(name = chr(173), value = chr(173), inline=False)
-                e.add_field(name="How to participate?", value="!bid " + str(price+10), inline=False)
+                e.add_field(name="How to participate?", value="!bid " + str(price+a['increment']), inline=False)
                 e.set_footer(text='Goodluck!')
 
                 msg = await c.send(embed=e)
@@ -242,7 +241,7 @@ async def bid(ctx, price: int):
                 save_auc_history()
                 
                 bid_embed=discord.Embed(title=str(ctx.message.author.name) + " placed a new bid!", description="Price: "+str(price)+"ADA", color=0x00a113)
-                bid_embed.add_field(name=chr(173), value="How to participate: !bid " + str(price+10), inline=False)
+                bid_embed.add_field(name=chr(173), value="How to participate: !bid " + str(price+a['increment']), inline=False)
                 bid_embed.set_footer(text=str(now))
 
                 await ctx.send(embed=bid_embed)
