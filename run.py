@@ -61,11 +61,14 @@ async def update_tx(a_id):
     
     await c.send(embed=e)
 
-async def reply_error(ctx, e):
+async def reply_error_delete(ctx, e):
     reply = await ctx.message.reply(e)
     time.sleep(2)
     await ctx.message.delete()
     await reply.delete()
+
+async def reply_error(ctx, e):
+    await ctx.message.reply(e)
 
 async def handle_start(a_id):
     print('auction-' + auctions[a_id]['name'] + ' started!')
@@ -95,9 +98,10 @@ async def run_checks():
     while looping:
 
         if ready:
-            now = datetime.now()
-
+            
             for a_id in auctions_list[:]:
+
+                now = datetime.now()
 
                 if bot.get_channel(int(a_id)) == None:
                     print('Detected removed channel, deleting auction')
@@ -114,7 +118,8 @@ async def run_checks():
             if len(auctions_list) == 0:
                 looping = False
         
-        await asyncio.sleep(5)
+        await asyncio.sleep(2)
+
 
 @bot.event
 async def on_ready():
@@ -122,8 +127,8 @@ async def on_ready():
     global ready
     ready = True
 
-@bot.command(name='create', help='Creates a new auction', usage='<name> <price> <increment> <start(yyyy-MM-ddTHH:mm:ss)> <end(yyyy-MM-ddTHH:mm:ss)> <image-url> \n\n -- Note all times are in UTC --')
-async def create(ctx, name, price: int, increment: int, start, end, url):
+@bot.command(name='create', help='This command is used to create a new auction.\n\nNOTE:\n1. All arguments are required, execpt for image-url\n2. Dates are expected in the UTC timezone\n3. Please make sure to include the "T" between the date and time\n4. To delete an auction you can just delete the channel', usage='<name> <price> <increment> <start(yyyy-MM-ddTHH:mm:ss)> <end(yyyy-MM-ddTHH:mm:ss)> <image-url>')
+async def create(ctx, name, price: int, increment: int, start, end, url='none'):
     global looping 
 
     if (str(ctx.channel.id) == COMMAND_CHANNEL):
@@ -137,46 +142,53 @@ async def create(ctx, name, price: int, increment: int, start, end, url):
 
             c = await guild.create_text_channel(auctionName, category=discord.utils.get(guild.categories, name='Auctions'))
 
-            auctions[str(c.id)] = {
-                'name': name,
-                'price': price,
-                'increment': increment,
-                'highBid': price,
-                'highBidId': None,
-                'highBidName': None,
-                'start': datetime.strptime(start, "%Y-%m-%dT%H:%M:%S"),
-                'end': datetime.strptime(end, "%Y-%m-%dT%H:%M:%S"),
-                'active': False,
-                'bids': 0
-            }
+            try:
 
-            auctions_list.append(str(c.id))
+                auctions[str(c.id)] = {
+                    'name': name,
+                    'price': price,
+                    'increment': increment,
+                    'highBid': price,
+                    'highBidId': None,
+                    'highBidName': None,
+                    'start': datetime.strptime(start, "%Y-%m-%dT%H:%M:%S"),
+                    'end': datetime.strptime(end, "%Y-%m-%dT%H:%M:%S"),
+                    'active': False,
+                    'bids': 0
+                }
 
-            await ctx.send("Auction Created!")
+                auctions_list.append(str(c.id))
 
-            e = discord.Embed(
-                title="Auction: " + name,
-                description="A new auction has been created for " + name,
-                color=0xFF5733
-            )
+                e = discord.Embed(
+                    title="Auction - " + name,
+                    description="A new auction has been created for " + name,
+                    color=0xfdbf2f
+                )
+                if url != 'none':
+                    e.set_thumbnail(url=url)
 
-            e.set_thumbnail(url=url)
-            e.add_field(name="Reserve Price:", value=str(price)+"ADA", inline=True)
-            e.add_field(name="Increment:", value=str(increment)+"ADA", inline=True)
-            e.add_field(name = chr(173), value = chr(173), inline=False)
-            e.add_field(name="Start time (UTC)", value=datetime.strptime(start, "%Y-%m-%dT%H:%M:%S"), inline=True)
-            e.add_field(name="End Time (UTC)", value=datetime.strptime(end, "%Y-%m-%dT%H:%M:%S"), inline=True)
-            e.add_field(name = chr(173), value = chr(173), inline=False)
-            e.add_field(name="Highest Bidder:", value="---", inline=True)
-            e.add_field(name="Price:", value="---", inline=True)
-            e.add_field(name = chr(173), value = chr(173), inline=False)
-            e.add_field(name="How to participate?", value="!bid " + str(price+10), inline=False)
-            e.set_footer(text='Goodluck!')
+                e.add_field(name="Starting Price:", value=str(price)+"ADA", inline=True)
+                e.add_field(name="Increment:", value=str(increment)+"ADA", inline=True)
+                e.add_field(name = chr(173), value = chr(173), inline=False)
+                e.add_field(name="Start time (UTC)", value=datetime.strptime(start, "%Y-%m-%dT%H:%M:%S"), inline=True)
+                e.add_field(name="End Time (UTC)", value=datetime.strptime(end, "%Y-%m-%dT%H:%M:%S"), inline=True)
+                e.add_field(name = chr(173), value = chr(173), inline=False)
+                e.add_field(name="Highest Bidder:", value="---", inline=True)
+                e.add_field(name="Price:", value="---", inline=True)
+                e.add_field(name = chr(173), value = chr(173), inline=False)
+                e.add_field(name="How to participate?", value="!bid " + str(price+10), inline=False)
+                e.set_footer(text='Goodluck!')
 
-            msg = await c.send(embed=e)
+                msg = await c.send(embed=e)
 
-            auctions[str(c.id)]['embed'] = e.to_dict()
-            auctions[str(c.id)]['msg_id'] = msg.id
+                auctions[str(c.id)]['embed'] = e.to_dict()
+                auctions[str(c.id)]['msg_id'] = msg.id
+
+                await ctx.send("Auction Created!")
+            except: 
+                if c:
+                    await c.delete()
+                raise
 
             save_auc_history()
 
@@ -188,9 +200,21 @@ async def create(ctx, name, price: int, increment: int, start, end, url):
             await reply_error(ctx, "Auction channel already exists")
             
     else: 
-        await reply_error(ctx, "Creating auctions is not permitted from this channel")
+        pass
 
-@bot.command(name='bid', help='Creates a bid', usage='!bid <price>')
+@create.error
+async def create_error(ctx, error):
+
+    if str(ctx.channel.id) != COMMAND_CHANNEL:
+        pass
+    elif isinstance(error, commands.MissingRequiredArgument):
+        message = f"Missing a required argument. Use '!help create' to view arguments"
+    else: 
+        message = "Something went wrong while running the command. Please re-look at it and try again(use '!help create' to get info)"
+
+    await ctx.message.reply(message)
+
+@bot.command(name='bid', help='Creates a bid', usage='<price>')
 async def bid(ctx, price: int):
 
     now = datetime.now()
@@ -216,8 +240,8 @@ async def bid(ctx, price: int):
                 
                 save_auc_history()
                 
-                bid_embed=discord.Embed(title="Bid Accepted!", description=ctx.message.author.name + " placed a bid", color=0x00a113)
-                bid_embed.add_field(name="Price:", value=str(price)+"ADA")
+                bid_embed=discord.Embed(title=str(ctx.message.author.name) + " placed a new bid!", description="Price: "+str(price)+"ADA", color=0x00a113)
+                bid_embed.add_field(name=chr(173), value="How to participate: !bid " + str(price+10), inline=False)
                 bid_embed.set_footer(text=str(now))
 
                 await ctx.send(embed=bid_embed)
@@ -227,16 +251,26 @@ async def bid(ctx, price: int):
                 await org_embed_msg.edit(embed=discord.Embed.from_dict(a['embed']))
                 
             else:
-                await reply_error(ctx, "Min bid is: " + str(a['highBid'] + a['increment']) + "ADA")
+                await reply_error_delete(ctx, "Min bid is: " + str(a['highBid'] + a['increment']) + "ADA")
 
         elif a['start'] > now:
-           await reply_error(ctx, "This auction has not started yet")
+           await reply_error_delete(ctx, "This auction has not started yet")
 
         elif a['end'] < now:
-            await reply_error(ctx, "This auction has ended")
+            await reply_error_delete(ctx, "This auction has ended")
         
     else:
-        await reply_error(ctx, "This auction is no longer valid")
+        pass
+
+@bid.error
+async def bid_error(ctx, error):
+    if isinstance(error, commands.MissingRequiredArgument):
+        message = f"Missing a required argument"
+    else: 
+        message = "Please re-look at your command(use '!help bid')"
+
+    await ctx.message.reply(message, delete_after=5)
+    await ctx.message.delete(delay=5)
 
 if __name__ == "__main__":
     get_auc_history()
