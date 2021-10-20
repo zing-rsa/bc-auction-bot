@@ -207,12 +207,13 @@ async def create_error(ctx, error):
 
     if str(ctx.channel.id) != COMMAND_CHANNEL:
         pass
-    elif isinstance(error, commands.MissingRequiredArgument):
-        message = f"Missing a required argument. Use '!help create' to view arguments"
-    else: 
-        message = "Something went wrong while running the command. Please re-look at it and try again(use '!help create' to get info)"
+    else:
+        if isinstance(error, commands.MissingRequiredArgument):
+            message = f"Missing a required argument. Use '!help create' to view arguments"
+        else: 
+            message = "Something went wrong while running the command. Please re-look at it and try again(use '!help create' to get info)"
 
-    await ctx.message.reply(message)
+        await ctx.message.reply(message)
 
 @bot.command(name='bid', help='Creates a bid', usage='<price>')
 async def bid(ctx, price: int):
@@ -264,13 +265,16 @@ async def bid(ctx, price: int):
 
 @bid.error
 async def bid_error(ctx, error):
-    if isinstance(error, commands.MissingRequiredArgument):
-        message = f"Missing a required argument"
-    else: 
-        message = "Please re-look at your command(use '!help bid')"
-
-    await ctx.message.reply(message, delete_after=5)
-    await ctx.message.delete(delay=5)
+    if str(ctx.channel.id) not in auctions_list:
+        pass
+    else:
+        if isinstance(error, commands.MissingRequiredArgument):
+            message = f"Missing a required argument"
+        else: 
+            message = "Please re-look at your command(use '!help bid')"
+    
+        await ctx.message.reply(message, delete_after=5)
+        await ctx.message.delete(delay=5)
 
 if __name__ == "__main__":
     get_auc_history()
