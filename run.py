@@ -175,7 +175,7 @@ async def create(ctx, name, price: int, increment: int, start, end, url='none'):
                 e.add_field(name="Highest Bidder:", value="---", inline=True)
                 e.add_field(name="Price:", value="---", inline=True)
                 e.add_field(name = chr(173), value = chr(173), inline=False)
-                e.add_field(name="How to participate?", value="!bid " + str(price+a['increment']), inline=False)
+                e.add_field(name="How to participate?", value="!bid " + str(price+auctions[str(c.id)]['increment']), inline=False)
                 e.set_footer(text='Goodluck!')
 
                 msg = await c.send(embed=e)
@@ -201,18 +201,18 @@ async def create(ctx, name, price: int, increment: int, start, end, url='none'):
     else: 
         pass
 
-@create.error
-async def create_error(ctx, error):
-
-    if str(ctx.channel.id) != COMMAND_CHANNEL:
-        pass
-    else:
-        if isinstance(error, commands.MissingRequiredArgument):
-            message = f"Missing a required argument. Use '!help create' to view arguments"
-        else: 
-            message = "Something went wrong while running the command. Please re-look at it and try again(use '!help create' to get info)"
-
-        await ctx.message.reply(message)
+#@create.error
+#async def create_error(ctx, error):
+#
+#    if str(ctx.channel.id) != COMMAND_CHANNEL:
+#        pass
+#    else:
+#        if isinstance(error, commands.MissingRequiredArgument):
+#            message = f"Missing a required argument. Use '!help create' to view arguments"
+#        else: 
+#            message = "Something went wrong while running the command. Please re-look at it and try again(use '!help create' to get info)"
+#
+#        await ctx.message.reply(message)
 
 @bot.command(name='bid', help='Creates a bid', usage='<price>')
 async def bid(ctx, price: int):
