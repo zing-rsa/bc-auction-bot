@@ -5,7 +5,7 @@ import json
 import copy
 import discord
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from pymongo import MongoClient
 from discord.ext import commands, tasks
 
@@ -219,6 +219,7 @@ async def bid(ctx, price: int):
 
     now = datetime.now()
     a_id = ctx.channel.id
+    extended = False
 
     if str(a_id) in auctions_list:
 
@@ -232,6 +233,10 @@ async def bid(ctx, price: int):
                 a['highBidName'] = ctx.message.author.name
                 a['bids'] = a['bids'] + 1
 
+                if now > a['end'] - timedelta(minutes=5):
+                    a['end'] = a['end'] + timedelta(minutes=5)
+                    extended = True
+
                 for field in a['embed']['fields']:
                     if field['name'] == 'Price:':
                         field['value'] = price
@@ -239,12 +244,15 @@ async def bid(ctx, price: int):
                          field['value'] = ctx.message.author.name
                 
                 save_auc_history()
-                
+
                 bid_embed=discord.Embed(title=str(ctx.message.author.name) + " placed a new bid!", description="Price: "+str(price)+"ADA", color=0x00a113)
                 bid_embed.add_field(name=chr(173), value="How to participate: !bid " + str(price+a['increment']), inline=False)
                 bid_embed.set_footer(text=str(now))
 
                 await ctx.send(embed=bid_embed)
+                
+                if extended:
+                    await ctx.send("Auction extended by 5 min! New end time: " + str(a['end']))
 
                 org_embed_msg = await ctx.fetch_message(a['msg_id'])
 

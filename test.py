@@ -1,11 +1,13 @@
 import os
-from pymongo import MongoClient
+from datetime import datetime, timedelta
 
-MONGO_URL = os.getenv('MONGO_URL')
 
-client = MongoClient(MONGO_URL)
-db=client.bensdb
-mongo_auctions = db.auctions
-db_results = mongo_auctions.find_one({})
+now = datetime.now()
 
-print(db_results)
+future = datetime.strptime('2021-10-25T08:05:00', "%Y-%m-%dT%H:%M:%S")
+
+if now > future - timedelta(minutes=5):
+    print( datetime.strptime(now, "%Y-%m-%dT%H:%M:%S") )
+
+
+
