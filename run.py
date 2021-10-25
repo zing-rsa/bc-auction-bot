@@ -226,7 +226,7 @@ async def bid(ctx, price: int):
         a = auctions[str(a_id)]
 
         if a['start'] < now and a['end'] > now:
-            if price >= (a['highBid'] + a['increment']):
+            if (price >= (a['highBid'] + a['increment'])) or (a['bids'] == 0 and price >= a['price']):
 
                 a['highBid'] = price
                 a['highBidId'] = ctx.message.author.id
@@ -259,7 +259,11 @@ async def bid(ctx, price: int):
                 await org_embed_msg.edit(embed=discord.Embed.from_dict(a['embed']))
                 
             else:
-                await reply_error_delete(ctx, "Min bid is: " + str(a['highBid'] + a['increment']) + "ADA")
+                if a['bids'] == 0:
+                    await reply_error_delete(ctx, "Min bid is: " + str(a['price']) + "ADA")
+                else:
+                    await reply_error_delete(ctx, "Min bid is: " + str(a['highBid'] + a['increment']) + "ADA")
+
 
         elif a['start'] > now:
            await reply_error_delete(ctx, "This auction has not started yet")
