@@ -256,7 +256,7 @@ async def bid(ctx, price: int):
                 try:
                     if outBidId is not None:
                         user = await bot.fetch_user(int(outBidId))
-                        await ctx.send(user.mention)
+                        await ctx.send(user.mention + ' You have been outbid')
                 except:
                     print("Failed mention")
                 
