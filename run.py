@@ -228,6 +228,8 @@ async def bid(ctx, price: int):
         if a['start'] < now and a['end'] > now:
             if (price >= (a['highBid'] + a['increment'])) or (a['bids'] == 0 and price >= a['price']):
 
+                outBidId = a['highBidId']
+
                 a['highBid'] = price
                 a['highBidId'] = ctx.message.author.id
                 a['highBidName'] = ctx.message.author.name
@@ -250,6 +252,13 @@ async def bid(ctx, price: int):
                 bid_embed.set_footer(text=str(now))
 
                 await ctx.send(embed=bid_embed)
+
+                try:
+                    if outBidId is not None:
+                        user = await bot.fetch_user(int(outBidId))
+                        await ctx.send(user.mention)
+                except:
+                    print("Failed mention")
                 
                 if extended:
                     await ctx.send("Auction extended by 5 min! New end time: " + str(a['end']))
