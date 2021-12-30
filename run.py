@@ -201,19 +201,6 @@ async def create(ctx, name, price: int, increment: int, start, end, url='none'):
     else: 
         pass
 
-#@create.error
-#async def create_error(ctx, error):
-#
-#    if str(ctx.channel.id) != COMMAND_CHANNEL:
-#        pass
-#    else:
-#        if isinstance(error, commands.MissingRequiredArgument):
-#            message = f"Missing a required argument. Use '!help create' to view arguments"
-#        else: 
-#            message = "Something went wrong while running the command. Please re-look at it and try again(use '!help create' to get info)"
-#
-#        await ctx.message.reply(message)
-
 @bot.command(name='bid', help='Creates a bid', usage='<price>')
 async def bid(ctx, price: int):
 
@@ -282,6 +269,14 @@ async def bid(ctx, price: int):
         
     else:
         pass
+
+@bot.command(name='end', help='Ends an open auction', usage='<auctionID> \n\nNOTE:\nTo end an auction you need to reference it by the ID of the channel it is in. Enable Discord developer mode(Settings > Advanced > Developer Mode), right click on the auction channel and click "Copy ID" at the bottom to get the ID.')
+async def end(ctx, a_id):
+    if (str(ctx.channel.id) == COMMAND_CHANNEL):
+        if a_id in auctions_list and a_id in auctions:
+            await handle_end(a_id)
+        else:
+            await reply_error(ctx, 'Cant find that auction')
 
 @bid.error
 async def bid_error(ctx, error):
