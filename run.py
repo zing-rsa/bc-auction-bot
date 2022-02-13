@@ -1,5 +1,6 @@
 # bot.py
 import os
+import sys
 import time
 import json
 import copy
@@ -14,17 +15,27 @@ GUILD = os.getenv('GUILD')
 COMMAND_CHANNEL = os.getenv('COMMAND_CHANNEL')
 TX_CHANNEL = os.getenv('TX_CHANNEL')
 MONGO_URL = os.getenv('MONGO_URL')
+ENV = os.getenv('ENV')
+AUCTION_CAT = os.getenv('AUCTION_CAT')
+
+client = MongoClient(MONGO_URL)
+
+if ENV == "Prod":
+    db = client.bensdb
+elif ENV == "Dev":
+    db = client.bensdb_local
+else:
+    print("Please specify environment")
+    sys.exit()
 
 auctions = {}
 auctions_list = []
 ready = False
 looping = True
 
-bot = commands.Bot(command_prefix='!')
-
-client = MongoClient(MONGO_URL)
-db = client.bensdb
 mongo_auctions = db.auctions
+
+bot = commands.Bot(command_prefix='!')
 
 def save_auc_history():
     mongo_auctions.replace_one({}, auctions, upsert=True)
@@ -132,14 +143,16 @@ async def create(ctx, name, price: int, increment: int, start, end, url='none'):
 
     if (str(ctx.channel.id) == COMMAND_CHANNEL):
 
-        auctionName = "auction-" + name.lower()
+        auctionName = name.lower()
 
         guild = bot.get_guild(int(GUILD))
         existing_channel = discord.utils.get(guild.channels, name=auctionName)
         
         if not existing_channel:
 
-            c = await guild.create_text_channel(auctionName, category=discord.utils.get(guild.categories, name='Auctions'))
+            auction_cat = discord.utils.get(guild.categories, id=int(AUCTION_CAT))
+
+            c = await guild.create_text_channel(auctionName, category=auction_cat)
 
             try:
 
